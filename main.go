@@ -7,12 +7,13 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 )
 
 type Config struct {
-	Auth   Auth    `json:"auth"`
-	Guild  Guild   `json:"guild"`
-	Sounds []Sound `json:"sounds"`
+	Auth   Auth             `json:"auth"`
+	Guild  Guild            `json:"guild"`
+	Sounds map[string]Sound `json:"sounds"`
 }
 
 type Auth struct {
@@ -32,12 +33,22 @@ type Channels struct {
 type Sound struct {
 	ID      string `json:"id"`
 	GuildID string `json:"sourceGuildID"`
-	Keybind string `json:"keybind"`
 }
 
 func main() {
+	args := os.Args[1:]
+	if len(args) != 2 {
+		fmt.Println("Usage: disgoboard play <sound name>")
+		os.Exit(1)
+	}
+
 	cfg := loadConfig()
-	err := cfg.playSound(cfg.Sounds[0])
+	sound, found := cfg.Sounds[args[1]]
+	if !found {
+		fmt.Printf("Undefined sound: %s\n", args[1])
+		os.Exit(1)
+	}
+	err := cfg.playSound(sound)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -60,7 +71,7 @@ func (cfg *Config) playSound(sbItem Sound) error {
 	if err != nil {
 		return err
 	}
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode > 299 {
 		resBody, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("discord api error: status %d: %s", resp.StatusCode, string(resBody))
 	}
@@ -69,7 +80,13 @@ func (cfg *Config) playSound(sbItem Sound) error {
 }
 
 func loadConfig() Config {
-	jsonConfig, err := os.Open(".config.json")
+	usrHome, err := os.UserHomeDir()
+	if err != nil {
+		fmt.Println("could not find users home directory")
+		os.Exit(1)
+	}
+	configPath := filepath.Join(usrHome, ".config", "disgoboard", "config.json")
+	jsonConfig, err := os.Open(configPath)
 	if err != nil {
 		fmt.Println("could not load config file")
 		os.Exit(1)

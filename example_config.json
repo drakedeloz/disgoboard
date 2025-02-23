@@ -1,0 +1,18 @@
+{
+  "auth": {
+    "token": "USER_TOKEN"
+  },
+  "guild": {
+    "id": "GUILD_ID",
+    "channels": {
+      "primaryChannelID": "CHANNEL_ID",
+      "secondaryChannelID": "CHANNEL_ID"
+    }
+  },
+  "sounds": {
+    "Name": {
+      "id": "SOUND_ID",
+      "sourceGuildId": "SOURCE_GUILD_ID"
+    }
+  }
+}
