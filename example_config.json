@@ -1,13 +1,11 @@
 {
   "auth": {
-    "token": "USER_TOKEN"
+    "userID": "USER_ID",
+    "token": "USER_TOKEN",
+    "botToken": "BOT_TOKEN"
   },
   "guild": {
-    "id": "GUILD_ID",
-    "channels": {
-      "primaryChannelID": "CHANNEL_ID",
-      "secondaryChannelID": "CHANNEL_ID"
-    }
+    "id": "GUILD_ID"
   },
   "sounds": {
     "Name": {

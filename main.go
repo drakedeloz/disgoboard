@@ -17,17 +17,18 @@ type Config struct {
 }
 
 type Auth struct {
-	Token string `json:"token"`
+	UserID   string `json:"userID"`
+	Token    string `json:"token"`
+	BotToken string `json:"botToken"`
 }
 
 type Guild struct {
-	ID       string   `json:"id"`
-	Channels Channels `json:"channels"`
+	ID string `json:"id"`
 }
 
-type Channels struct {
-	PrimaryChannelID   string `json:"primaryChannelID"`
-	SecondaryChannelID string `json:"secondaryChannelID"`
+type Channel struct {
+	ChannelID string `json:"channel_id"`
+	DeafState bool   `json:"self_deaf"`
 }
 
 type Sound struct {
@@ -55,7 +56,16 @@ func main() {
 }
 
 func (cfg *Config) playSound(sbItem Sound) error {
-	url := fmt.Sprintf("https://discord.com/api/v10/channels/%s/send-soundboard-sound", cfg.Guild.Channels.SecondaryChannelID)
+	usrChannel, err := cfg.getUserChannel()
+	if err != nil {
+		return err
+	}
+
+	if usrChannel.DeafState {
+		return fmt.Errorf("cannot play sound while deafened")
+	}
+
+	url := fmt.Sprintf("https://discord.com/api/v10/channels/%s/send-soundboard-sound", usrChannel.ChannelID)
 	jsonStr := fmt.Sprintf(`{"sound_id": "%s", "source_guild_id": "%s"}`, sbItem.ID, sbItem.GuildID)
 	body := bytes.NewBufferString(jsonStr)
 	req, err := http.NewRequest("POST", url, body)
@@ -77,6 +87,39 @@ func (cfg *Config) playSound(sbItem Sound) error {
 	}
 	defer resp.Body.Close()
 	return nil
+}
+
+func (cfg *Config) getUserChannel() (Channel, error) {
+	url := fmt.Sprintf("https://discord.com/api/v10/guilds/%s/voice-states/%s", cfg.Guild.ID, cfg.Auth.UserID)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return Channel{}, err
+	}
+	authString := fmt.Sprintf("Bot %s", cfg.Auth.BotToken)
+	req.Header.Set("Authorization", authString)
+
+	client := http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return Channel{}, err
+	}
+
+	if resp.StatusCode > 299 {
+		return Channel{}, fmt.Errorf("could not get user channel: %d", resp.StatusCode)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return Channel{}, err
+	}
+
+	var usrChannel Channel
+	err = json.Unmarshal(body, &usrChannel)
+	if err != nil {
+		return Channel{}, err
+	}
+	return usrChannel, nil
 }
 
 func loadConfig() Config {
