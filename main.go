@@ -44,6 +44,16 @@ func main() {
 	}
 
 	cfg := loadConfig()
+	if args[0] == "cache" {
+		err := cfg.commandCacheSounds()
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+		fmt.Println("config sounds cached successfuly")
+		return
+	}
+
 	sound, found := cfg.Sounds[args[1]]
 	if !found {
 		fmt.Printf("Undefined sound: %s\n", args[1])
@@ -123,11 +133,7 @@ func (cfg *Config) getUserChannel() (Channel, error) {
 }
 
 func loadConfig() Config {
-	usrHome, err := os.UserHomeDir()
-	if err != nil {
-		fmt.Println("could not find users home directory")
-		os.Exit(1)
-	}
+	usrHome := getUserHome()
 	configPath := filepath.Join(usrHome, ".config", "disgoboard", "config.json")
 	jsonConfig, err := os.Open(configPath)
 	if err != nil {
