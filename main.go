@@ -37,21 +37,28 @@ type Sound struct {
 }
 
 func main() {
-	args := os.Args[1:]
-	if len(args) != 2 {
-		fmt.Println("Usage: disgoboard play <sound name>")
-		os.Exit(1)
-	}
-
 	cfg := loadConfig()
-	if args[0] == "cache" {
-		err := cfg.commandCacheSounds()
+	args := os.Args[1:]
+
+	if args[0] == "add" && len(args) == 3 {
+		name, err := cfg.validateSound(args[1], args[2])
+		if err != nil {
+			fmt.Print(err)
+			return
+		}
+		cfg.addToSounds(name, args[1], args[2])
+		err = cfg.commandCacheSound(name)
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
 		}
 		fmt.Println("config sounds cached successfuly")
 		return
+	}
+
+	if len(args) != 2 {
+		fmt.Println("Usage: disgoboard play <sound name>")
+		os.Exit(1)
 	}
 
 	sound, found := cfg.Sounds[args[1]]
@@ -153,4 +160,65 @@ func loadConfig() Config {
 		fmt.Println(err)
 	}
 	return cfg
+}
+
+func (cfg *Config) validateSound(soundID, sourceGuildID string) (string, error) {
+	url := fmt.Sprintf("https://discord.com/api/v10/guilds/%s/soundboard-sounds/%s", sourceGuildID, soundID)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Authorization", cfg.Auth.Token)
+
+	client := http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+
+	if resp.StatusCode > 299 {
+		return "", fmt.Errorf("could not get sound info: %d", resp.StatusCode)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	validSound := struct {
+		Name      string `json:"name"`
+		Available bool   `json:"available"`
+	}{}
+
+	err = json.Unmarshal(body, &validSound)
+	if err != nil {
+		return "", err
+	}
+
+	if !validSound.Available {
+		return "", fmt.Errorf("sound not available: %s", validSound.Name)
+	}
+	return validSound.Name, nil
+}
+
+func (cfg *Config) addToSounds(name, soundID, sourceGuildID string) error {
+	addSound := Sound{
+		ID:      soundID,
+		GuildID: sourceGuildID,
+	}
+
+	cfg.Sounds[name] = addSound
+	jsonData, err := json.MarshalIndent(cfg, "", "	")
+	if err != nil {
+		return err
+	}
+
+	configPath := filepath.Join(getUserHome(), ".config", "disgoboard", "config.json")
+	err = os.WriteFile(configPath, jsonData, 0644)
+	if err != nil {
+		return fmt.Errorf("error writing json to file: %v", err)
+	}
+
+	fmt.Printf("%s added to Config\n", name)
+	return nil
 }
