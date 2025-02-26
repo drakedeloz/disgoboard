@@ -65,7 +65,7 @@ func main() {
 			fmt.Println(err)
 			os.Exit(1)
 		}
-		fmt.Println("config sounds cached successfuly")
+		fmt.Printf("%s cached successfuly\n", name)
 		return
 	}
 
