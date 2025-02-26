@@ -49,8 +49,8 @@ func main() {
 	if args[0] == "list" {
 		for key, _ := range cfg.Sounds {
 			fmt.Println(key)
-			return
 		}
+		return
 	}
 
 	if args[0] == "add" && len(args) == 3 {
