@@ -8,6 +8,12 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
+
+	"github.com/gopxl/beep"
+	"github.com/gopxl/beep/effects"
+	"github.com/gopxl/beep/mp3"
+	"github.com/gopxl/beep/speaker"
 )
 
 type Config struct {
@@ -40,6 +46,13 @@ func main() {
 	cfg := loadConfig()
 	args := os.Args[1:]
 
+	if args[0] == "list" {
+		for key, _ := range cfg.Sounds {
+			fmt.Println(key)
+			return
+		}
+	}
+
 	if args[0] == "add" && len(args) == 3 {
 		name, err := cfg.validateSound(args[1], args[2])
 		if err != nil {
@@ -67,6 +80,11 @@ func main() {
 		os.Exit(1)
 	}
 	err := cfg.playSound(sound)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	err = cfg.playSoundLocal(sound)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -103,6 +121,38 @@ func (cfg *Config) playSound(sbItem Sound) error {
 		return fmt.Errorf("discord api error: status %d: %s", resp.StatusCode, string(resBody))
 	}
 	defer resp.Body.Close()
+	return nil
+}
+
+func (cfg *Config) playSoundLocal(sbItem Sound) error {
+	soundFilePath := filepath.Join(getUserHome(), ".cache", "disgoboard", sbItem.ID+".mp3")
+	soundFile, err := os.Open(soundFilePath)
+	if err != nil {
+		return err
+	}
+	defer soundFile.Close()
+
+	streamer, format, err := mp3.Decode(soundFile)
+	if err != nil {
+		return err
+	}
+	defer streamer.Close()
+
+	speaker.Init(format.SampleRate, format.SampleRate.N(time.Second/10))
+
+	volumeCtrl := &effects.Volume{
+		Streamer: streamer,
+		Base:     2,
+		Volume:   -5.5,
+		Silent:   false,
+	}
+
+	done := make(chan bool)
+	speaker.Play(beep.Seq(volumeCtrl, beep.Callback(func() {
+		done <- true
+	})))
+
+	<-done
 	return nil
 }
 
